@@ -69,4 +69,4 @@ Execute:
 
 📌 Licença
 
-Este projeto está licenciado sob a Open Source Code.
+Este projeto está licenciado sob a GNU General Public License v3.0.
