@@ -22,19 +22,19 @@ def verificar_dependencias_sistema():
     if shutil.which("python3") is None:
         print("Erro: Python3 não está instalado.")
         sys.exit(1)
-    
+
     if shutil.which("pip3") is None:
         print("Instalando pip...")
-        subprocess.run(["sudo", "apt", "install", "-y", "python3-pip"], check=True)
+        subprocess.run(["sudo", "apt-get", "install", "-y", "python3-pip"], check=True)
 
     if shutil.which("dialog") is None:
         print("Instalando o utilitário dialog...")
-        subprocess.run(["sudo", "apt", "install", "-y", "dialog"], check=True)
+        subprocess.run(["sudo", "apt-get", "install", "-y", "dialog"], check=True)
 
 # Verifica e instala o python3-dialog
 def instalar_dialog():
     verificar_dependencias_sistema()
-    
+
     if not pacote_python_instalado("dialog"):
         instalar_pacote_pip("python3-dialog")
 
@@ -49,7 +49,7 @@ d = instalar_dialog()
 d.set_background_title("Instalador de Programas por Categoria")
 
 CATEGORIAS = {
-    "Sistema": {
+    "🛠️ Sistema": {
         "gparted": "Editor de partições",
         "gnome-disk-utility": "Utilitário de discos",
         "baobab": "Analisador de espaço",
@@ -65,7 +65,7 @@ CATEGORIAS = {
         "smartmontools": "Monitoramento de discos",
         "numlockx": "Ativar Num Lock no login"
     },
-    "Multimídia": {
+    "🎥 Multimídia": {
         "vlc": "Reprodutor de mídia",
         "gimp": "Editor de imagens",
         "kdenlive": "Editor de vídeo",
@@ -83,7 +83,7 @@ CATEGORIAS = {
         "rhythmbox": "Organizador de músicas",
         "brasero": "Gravação de CDs/DVDs"
     },
-    "Internet": {
+    "🌐 Internet": {
         "firefox": "Navegador Mozilla",
         "chromium-browser": "Navegador Chromium",
         "brave-browser": "Navegador Brave",
@@ -100,7 +100,7 @@ CATEGORIAS = {
         "lynx": "Navegador de terminal",
         "weechat": "Chat IRC em terminal"
     },
-    "Escritório": {
+    "📋 Escritório": {
         "libreoffice": "Suite de escritório",
         "okular": "Visualizador de PDF",
         "evince": "Visualizador de documentos",
@@ -111,7 +111,7 @@ CATEGORIAS = {
         "zathura": "Visualizador de PDF leve",
         "onlyoffice-desktopeditors": "Suite alternativa"
     },
-    "Desenvolvimento": {
+    "💻 Desenvolvimento": {
         "git": "Controle de versão",
         "vim": "Editor de texto",
         "geany": "IDE leve",
@@ -130,7 +130,7 @@ CATEGORIAS = {
         "flatpak": "Gerenciador de apps universal",
         "snapd": "Gerenciador Snap"
     },
-    "Utilitários": {
+    "🧰 Utilitários": {
         "neofetch": "Info do sistema",
         "htop": "Monitor do sistema",
         "curl": "Transferência HTTP",
@@ -146,32 +146,81 @@ CATEGORIAS = {
         "stacer": "Otimizador de sistema",
         "preload": "Melhor desempenho de apps",
         "indicator-multiload": "Monitor do sistema na bandeja"
+    },
+    "🎮 Jogos (Steam, Lutris e Wine)": {
+        "steam": "Plataforma Steam",
+        "lutris": "Gerenciador de jogos",
+        "wine": "Executar programas do Windows",
+        "winetricks": "Ajustes e dependências do Wine",
+        "playonlinux": "Interface para Wine",
+        "gamemode": "Melhor desempenho para jogos",
+        "glxinfo": "Informações da GPU (mesa-utils)",
+        "vulkan-tools": "Ferramentas Vulkan"
     }
 }
 
+selecionados = []
+log_file = open("instalador.log", "w")
+
 def instalar_pacotes(lista):
-    subprocess.run(["sudo", "apt", "update", "-y"], stdout=subprocess.DEVNULL)
-    subprocess.run(["sudo", "apt", "upgrade", "-y"], stdout=subprocess.DEVNULL)
+    subprocess.run(["sudo", "apt-get", "update", "-y"], stdout=log_file, stderr=log_file)
+    subprocess.run(["sudo", "apt-get", "upgrade", "-y"], stdout=log_file, stderr=log_file)
     for pkg in lista:
         d.gauge_start(text=f"Instalando {pkg}...", percent=0)
-        subprocess.run(["sudo", "apt", "install", "-y", pkg], stdout=subprocess.DEVNULL)
+        log_file.write(f"Instalando {pkg}\n")
+        subprocess.run(["sudo", "apt-get", "install", "-y", pkg], stdout=log_file, stderr=log_file)
         d.gauge_update(100)
-    subprocess.run(["sudo", "apt", "install", "-y", "ubuntu-restricted-extras"], stdout=subprocess.DEVNULL)
-    subprocess.run(["sudo", "ubuntu-drivers", "autoinstall"], stdout=subprocess.DEVNULL)
+    subprocess.run(["sudo", "apt-get", "install", "-y", "ubuntu-restricted-extras"], stdout=log_file, stderr=log_file)
+    subprocess.run(["sudo", "ubuntu-drivers", "autoinstall"], stdout=log_file, stderr=log_file)
 
-selecionados = []
+# Lista temporária para pacotes buscados na busca manual
+busca_pacotes = []
 
 while True:
     code, categoria = d.menu(
         "Escolha uma categoria para instalar programas:",
-        choices=[(key, f"{len(value)} programas") for key, value in CATEGORIAS.items()] + [("Finalizar", "Prosseguir para instalação")],
+        choices=[(key, f"{len(value)} programas") for key, value in CATEGORIAS.items()] +
+                [("🔍 Buscar pacote", "Procurar e adicionar um pacote específico"),
+                 ("Finalizar", "Prosseguir para instalação")],
         width=70,
         height=20,
-        menu_height=10
+        menu_height=12
     )
 
-    if code != d.OK or categoria == "Finalizar":
+    if code != d.OK:
         break
+
+    if categoria == "Finalizar":
+        break
+    elif categoria == "🔍 Buscar pacote":
+        while True:
+            code, pacote = d.inputbox("Digite o nome do pacote que deseja buscar (deixe vazio para finalizar):")
+            if code != d.OK or not pacote.strip():
+                # Sai da busca manual se o usuário cancelar ou não digitar nada
+                break
+
+            resultado = subprocess.run(["apt-get", "show", pacote], capture_output=True, text=True)
+            if resultado.returncode == 0:
+                if pacote not in busca_pacotes:
+                    busca_pacotes.append(pacote)
+                d.msgbox(f"Pacote '{pacote}' encontrado e adicionado na lista de busca.")
+            else:
+                d.msgbox("Pacote não encontrado.")
+
+        # Após terminar a busca, permite selecionar múltiplos pacotes buscados para instalação
+        if busca_pacotes:
+            choices = [(p, p, True) for p in busca_pacotes]
+            code, pacotes = d.checklist(
+                "Selecione os pacotes buscados para instalar:",
+                choices=choices,
+                width=70,
+                height=20,
+                list_height=10
+            )
+            if code == d.OK:
+                selecionados.extend(pacotes)
+            busca_pacotes = []
+        continue
 
     programas = CATEGORIAS[categoria]
     checklist = [(pkg, desc, False) for pkg, desc in programas.items()]
@@ -189,9 +238,15 @@ while True:
 
 selecionados = list(set(selecionados))
 
+if "steam" in selecionados:
+    d.infobox("Habilitando suporte a 32 bits necessário para Steam...")
+    subprocess.run(["sudo", "dpkg", "--add-architecture", "i386"], check=True)
+    subprocess.run(["sudo", "apt-get", "update", "-y"], stdout=log_file, stderr=log_file)
+
 if selecionados:
     instalar_pacotes(selecionados)
     d.msgbox("✅ Instalação concluída com sucesso!", width=50)
 else:
     d.msgbox("Nenhum programa foi selecionado.", width=50)
 
+log_file.close()
